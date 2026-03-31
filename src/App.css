@@ -192,3 +192,27 @@
     background-color: aqua;
     justify-items: center;
 }
+
+.filter-buttons button {
+    padding: 10px 20px;
+    margin: 5px;
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    cursor: pointer;
+    transition: all 0.2s ease; /* Smooth transition */
+    border-radius: 5px;
+}
+
+/* The "Clicked" / Active State */
+.filter-buttons button.active {
+    background-color: #e0e0e0;
+    border-color: #999;
+    /* Inset shadow makes it look pushed down */
+    box-shadow: inset 0px 4px 8px rgba(0, 0, 0, 0.2);
+    transform: translateY(1px); /* Slight sink effect */
+}
+
+/* Optional: Regular shadow for unclicked buttons */
+.filter-buttons button:not(.active) {
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+}

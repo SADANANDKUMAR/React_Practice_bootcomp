@@ -74,3 +74,42 @@ Build a product listing page with a filter button.
 This question uses **`useState`** to track which filter/category is selected — you've read about it, now use it! 🙂
 
 Give it a shot and paste your code when ready! 💪
+
+
+## 🧩 Question: Counter App
+
+Build a simple counter app using  **`useState`** .
+
+### Requirements:
+
+1. Display a **count number** on screen, starting at `0`.
+2. Add  **3 buttons** :
+   * `"Increment"` → increases count by 1
+   * `"Decrement"` → decreases count by 1
+   * `"Reset"` → sets count back to `0`
+3. **Extra challenge:**
+   * If count goes  **below 0** , show the number in **red**
+   * If count is  **above 0** , show in **green**
+   * If count is  **0** , show in **black**
+4. Add a **step input** — user can type a number (e.g. 5) and increment/decrement by that step instead of 1.
+
+---
+
+### 🖼️ Expected Output:
+
+```
+        [ - ]  25  [ + ]  
+           [ Reset ]
+
+    Step: [  5  ]
+
+    (number is green since > 0)
+```
+
+---
+
+### 💡 Concepts used:
+
+* `useState` for count and step
+* Conditional styling based on state
+* Controlled input (`value` + `onChange`)

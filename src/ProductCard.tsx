@@ -14,13 +14,25 @@ const ProductCard = ({products}) => {
             <div>
                 <h1>2. Problem Statement: Product Card</h1>
 
-                {/* 2. Filter Buttons */}
                 <div className='filter-buttons'>
-                    <button onClick={() => setFilter('All')}>Show All</button>
-                    <button onClick={() => setFilter('Electronics')}>
+                    <button
+                        className={filter === 'All' ? 'active' : ''}
+                        onClick={() => setFilter('All')}
+                    >
+                        Show All
+                    </button>
+
+                    <button
+                        className={filter === 'Electronics' ? 'active' : ''}
+                        onClick={() => setFilter('Electronics')}
+                    >
                         Show Electronics
                     </button>
-                    <button onClick={() => setFilter('Clothing')}>
+
+                    <button
+                        className={filter === 'Clothing' ? 'active' : ''}
+                        onClick={() => setFilter('Clothing')}
+                    >
                         Show Clothing
                     </button>
                 </div>
@@ -33,6 +45,11 @@ const ProductCard = ({products}) => {
                         <li>Name: {productitems.name}</li>
                         <li>Price: {productitems.price}</li>
                         <li>Category: {productitems.category}</li>
+                        <li>
+                            {productitems.inStock
+                                ? '✅ In Stock'
+                                : '❌ Out of Stock'}
+                        </li>
                     </ul>
                 </div>
             ))}

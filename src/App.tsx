@@ -72,8 +72,8 @@ function App() {
 
     return (
         <>
-            {/* <UserCard users={users} /> */}
-            <ProductCard products={products} />
+            <UserCard users={users} />
+            {/* <ProductCard products={products} /> */}
         </>
     );
 }

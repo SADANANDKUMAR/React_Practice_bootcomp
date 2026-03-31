@@ -1,0 +1,28 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #0a0f1a;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* ReactFlow overrides */
+.react-flow__edge-path {
+  stroke: #3b82f6 !important;
+  stroke-width: 2 !important;
+}
+
+.react-flow__connection-line {
+  stroke: #6366f1 !important;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.4);
+  transition: transform 0.1s;
+}
