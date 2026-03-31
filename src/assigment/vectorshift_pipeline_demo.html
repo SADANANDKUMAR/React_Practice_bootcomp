@@ -1,0 +1,294 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+#app { width: 100%; background: #0a0f1a; border-radius: var(--border-radius-lg); overflow: hidden; }
+.toolbar { background: #131b2a; border-bottom: 1px solid #1e2d40; padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { font-size: 13px; font-weight: 500; color: #e2e8f0; padding-right: 12px; border-right: 1px solid #1e2d40; display: flex; align-items: center; gap: 6px; }
+.node-pill { padding: 5px 10px; border-radius: 7px; font-size: 11px; font-weight: 500; cursor: grab; user-select: none; display: flex; align-items: center; gap: 5px; transition: transform 0.1s; }
+.node-pill:hover { transform: translateY(-1px); }
+.canvas-area { position: relative; width: 100%; height: 460px; overflow: hidden; }
+#canvas { width: 100%; height: 100%; }
+.footer { background: #131b2a; border-top: 1px solid #1e2d40; padding: 10px; display: flex; justify-content: center; align-items: center; gap: 12px; }
+.submit-btn { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border: none; border-radius: 7px; padding: 8px 28px; font-size: 12px; font-weight: 500; cursor: pointer; letter-spacing: 0.3px; transition: opacity 0.2s, transform 0.1s; }
+.submit-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.result-badge { font-size: 11px; color: #10b981; background: #10b98120; border: 1px solid #10b98140; border-radius: 5px; padding: 4px 10px; display: none; }
+.hint { font-size: 11px; color: #4a5568; }
+</style>
+
+<div id="app">
+  <div class="toolbar">
+    <div class="brand">
+      <span style="font-size:16px">🔗</span>
+      <span>VectorShift</span>
+    </div>
+    <span style="font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:1px">Drag nodes</span>
+    <div class="node-pill" draggable="true" data-type="input" style="background:#10b98120;border:1px solid #10b98155;color:#6ee7b7" id="drag-input">📥 Input</div>
+    <div class="node-pill" draggable="true" data-type="llm" style="background:#8b5cf620;border:1px solid #8b5cf655;color:#c4b5fd" id="drag-llm">🤖 LLM</div>
+    <div class="node-pill" draggable="true" data-type="output" style="background:#f59e0b20;border:1px solid #f59e0b55;color:#fcd34d" id="drag-output">📤 Output</div>
+    <div class="node-pill" draggable="true" data-type="text" style="background:#3b82f620;border:1px solid #3b82f655;color:#93c5fd" id="drag-text">📝 Text</div>
+    <div class="node-pill" draggable="true" data-type="filter" style="background:#ec489920;border:1px solid #ec489955;color:#f9a8d4" id="drag-filter">🔍 Filter</div>
+    <div class="node-pill" draggable="true" data-type="transform" style="background:#a855f720;border:1px solid #a855f755;color:#d8b4fe" id="drag-transform">⚡ Transform</div>
+    <div class="node-pill" draggable="true" data-type="merge" style="background:#14b8a620;border:1px solid #14b8a655;color:#5eead4" id="drag-merge">🔀 Merge</div>
+    <div class="node-pill" draggable="true" data-type="api" style="background:#06b6d420;border:1px solid #06b6d455;color:#67e8f9" id="drag-api">🌐 API</div>
+    <div class="node-pill" draggable="true" data-type="note" style="background:#f9731620;border:1px solid #f9731655;color:#fdba74" id="drag-note">📌 Note</div>
+  </div>
+
+  <div class="canvas-area" id="canvas-area">
+    <canvas id="canvas"></canvas>
+    <div id="nodes-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></div>
+    <div id="hint-overlay" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none">
+      <div style="font-size:28px;margin-bottom:8px">🎨</div>
+      <div style="font-size:13px;color:#4a5568">Drag nodes from the toolbar onto the canvas</div>
+      <div style="font-size:11px;color:#374151;margin-top:4px">Click output handles to connect nodes</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="hint" id="status-hint">Build a pipeline then submit</span>
+    <button class="submit-btn" id="submit-btn">🚀 Submit Pipeline</button>
+    <div class="result-badge" id="result-badge"></div>
+  </div>
+</div>
+
+<script>
+const NODE_CONFIGS = {
+  input:     { title:'Input',     icon:'📥', color:'#10b981', fields:[{label:'Name',type:'text',val:'input_1'},{label:'Type',type:'select',options:['Text','File'],val:'Text'}], outputs:['value'], inputs:[] },
+  llm:       { title:'LLM',      icon:'🤖', color:'#8b5cf6', fields:[],                                                                                                        outputs:['response'], inputs:['system','prompt'] },
+  output:    { title:'Output',   icon:'📤', color:'#f59e0b', fields:[{label:'Name',type:'text',val:'output_1'},{label:'Type',type:'select',options:['Text','Image'],val:'Text'}], outputs:[], inputs:['value'] },
+  text:      { title:'Text',     icon:'📝', color:'#3b82f6', fields:[{label:'Text',type:'textarea',val:'{{input}}'}],                                                          outputs:['output'], inputs:['input'] },
+  filter:    { title:'Filter',   icon:'🔍', color:'#ec4899', fields:[{label:'Operator',type:'select',options:['contains','equals','startsWith'],val:'contains'},{label:'Value',type:'text',val:''}], outputs:['match','no-match'], inputs:['input'] },
+  transform: { title:'Transform',icon:'⚡', color:'#a855f7', fields:[{label:'Operation',type:'select',options:['uppercase','lowercase','trim','reverse'],val:'uppercase'}],     outputs:['output'], inputs:['input'] },
+  merge:     { title:'Merge',    icon:'🔀', color:'#14b8a6', fields:[{label:'Separator',type:'text',val:' '}],                                                                 outputs:['merged'], inputs:['input1','input2'] },
+  api:       { title:'API',      icon:'🌐', color:'#06b6d4', fields:[{label:'Method',type:'select',options:['GET','POST','PUT','DELETE'],val:'GET'},{label:'URL',type:'text',val:'https://'}], outputs:['response','error'], inputs:['body','headers'] },
+  note:      { title:'Note',     icon:'📌', color:'#f97316', fields:[{label:'Note',type:'textarea',val:''}],                                                                   outputs:[], inputs:[] },
+};
+
+let nodes = [], edges = [], nodeCounter = 0;
+let connecting = null, mousePos = {x:0,y:0};
+let draggingNode = null, dragOffsetX = 0, dragOffsetY = 0;
+let pendingType = null, pendingPos = null;
+
+const canvasArea = document.getElementById('canvas-area');
+const nodesLayer = document.getElementById('nodes-layer');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const hint = document.getElementById('hint-overlay');
+
+function resize() {
+  canvas.width = canvasArea.offsetWidth;
+  canvas.height = canvasArea.offsetHeight;
+  drawEdges();
+}
+resize();
+window.addEventListener('resize', resize);
+
+function getHandlePos(node, side, idx, total) {
+  const el = document.getElementById('node-'+node.id);
+  if (!el) return {x:0,y:0};
+  const x = node.x + (side==='right' ? el.offsetWidth : 0);
+  const y = node.y + el.offsetHeight * ((idx+1)/(total+1));
+  return {x, y};
+}
+
+function drawEdges() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  edges.forEach(e => {
+    const sNode = nodes.find(n=>n.id===e.source);
+    const tNode = nodes.find(n=>n.id===e.target);
+    if (!sNode||!tNode) return;
+    const sCfg = NODE_CONFIGS[sNode.type];
+    const tCfg = NODE_CONFIGS[tNode.type];
+    const si = sCfg.outputs.indexOf(e.sourceHandle);
+    const ti = tCfg.inputs.indexOf(e.targetHandle);
+    const sp = getHandlePos(sNode,'right',si,sCfg.outputs.length);
+    const tp = getHandlePos(tNode,'left',ti,tCfg.inputs.length);
+    const dx = Math.abs(tp.x-sp.x)*0.5;
+    ctx.beginPath();
+    ctx.moveTo(sp.x,sp.y);
+    ctx.bezierCurveTo(sp.x+dx,sp.y,tp.x-dx,tp.y,tp.x,tp.y);
+    ctx.strokeStyle = '#3b82f688';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+  if (connecting) {
+    const sNode = nodes.find(n=>n.id===connecting.nodeId);
+    const sCfg = NODE_CONFIGS[sNode.type];
+    const si = sCfg.outputs.indexOf(connecting.handle);
+    const sp = getHandlePos(sNode,'right',si,sCfg.outputs.length);
+    ctx.beginPath();
+    ctx.moveTo(sp.x,sp.y);
+    ctx.bezierCurveTo(sp.x+60,sp.y,mousePos.x-60,mousePos.y,mousePos.x,mousePos.y);
+    ctx.strokeStyle = '#6366f1aa';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5,4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function createNodeEl(node) {
+  const cfg = NODE_CONFIGS[node.type];
+  const el = document.createElement('div');
+  el.id = 'node-'+node.id;
+  el.style.cssText = `position:absolute;left:${node.x}px;top:${node.y}px;width:200px;background:#1e2433;border:1.5px solid ${cfg.color}55;border-radius:10px;pointer-events:all;user-select:none;font-family:var(--font-sans);`;
+
+  let fieldsHtml = cfg.fields.map((f,fi) => {
+    if (f.type==='select') return `<div style="margin-bottom:5px"><div style="font-size:9px;color:#8892a4;text-transform:uppercase;margin-bottom:2px">${f.label}</div><select style="width:100%;background:#0f1520;border:1px solid #2d3748;border-radius:5px;color:#e2e8f0;font-size:11px;padding:4px 6px;outline:none">${f.options.map(o=>`<option${o===f.val?' selected':''}>${o}</option>`).join('')}</select></div>`;
+    if (f.type==='textarea') return `<div style="margin-bottom:5px"><div style="font-size:9px;color:#8892a4;text-transform:uppercase;margin-bottom:2px">${f.label}</div><textarea rows="2" style="width:100%;background:#0f1520;border:1px solid #2d3748;border-radius:5px;color:#e2e8f0;font-size:11px;padding:4px 6px;outline:none;resize:none;font-family:inherit;box-sizing:border-box">${f.val}</textarea></div>`;
+    return `<div style="margin-bottom:5px"><div style="font-size:9px;color:#8892a4;text-transform:uppercase;margin-bottom:2px">${f.label}</div><input type="text" value="${f.val}" style="width:100%;background:#0f1520;border:1px solid #2d3748;border-radius:5px;color:#e2e8f0;font-size:11px;padding:4px 6px;outline:none;box-sizing:border-box"></div>`;
+  }).join('');
+
+  if (cfg.fields.length===0 && node.type==='llm') {
+    fieldsHtml = `<div style="font-size:11px;color:#8892a4;font-style:italic">Connect system + prompt inputs to generate a response.</div>`;
+  }
+
+  el.innerHTML = `
+    <div style="background:linear-gradient(90deg,${cfg.color}cc,${cfg.color}88);border-radius:8px 8px 0 0;padding:7px 10px;display:flex;align-items:center;gap:6px;cursor:move" class="drag-handle">
+      <span style="font-size:13px">${cfg.icon}</span>
+      <span style="color:#fff;font-weight:500;font-size:11px;letter-spacing:0.5px;text-transform:uppercase">${cfg.title}</span>
+      <span class="del-btn" style="margin-left:auto;cursor:pointer;color:#ffffff88;font-size:11px;padding:0 3px">✕</span>
+    </div>
+    <div style="padding:8px 10px 10px">
+      ${fieldsHtml}
+      <div style="display:flex;justify-content:space-between;margin-top:4px;position:relative">
+        <div class="in-handles" style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+          ${cfg.inputs.map(h=>`<div style="display:flex;align-items:center;gap:4px"><div class="in-handle" data-handle="${h}" style="width:10px;height:10px;border-radius:50%;background:${cfg.color};border:2px solid #1e2433;cursor:crosshair;margin-left:-19px;flex-shrink:0"></div><span style="font-size:9px;color:#8892a4">${h}</span></div>`).join('')}
+        </div>
+        <div class="out-handles" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          ${cfg.outputs.map(h=>`<div style="display:flex;align-items:center;gap:4px"><span style="font-size:9px;color:#8892a4">${h}</span><div class="out-handle" data-handle="${h}" style="width:10px;height:10px;border-radius:50%;background:${cfg.color};border:2px solid #1e2433;cursor:crosshair;margin-right:-19px;flex-shrink:0"></div></div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  el.querySelector('.drag-handle').addEventListener('mousedown', e => {
+    if (e.target.classList.contains('del-btn')) return;
+    draggingNode = node;
+    const r = el.getBoundingClientRect();
+    const cr = canvasArea.getBoundingClientRect();
+    dragOffsetX = e.clientX - r.left;
+    dragOffsetY = e.clientY - r.top;
+    e.preventDefault();
+  });
+
+  el.querySelector('.del-btn').addEventListener('click', () => {
+    nodes = nodes.filter(n=>n.id!==node.id);
+    edges = edges.filter(e=>e.source!==node.id&&e.target!==node.id);
+    el.remove();
+    drawEdges();
+    updateHint();
+  });
+
+  el.querySelectorAll('.out-handle').forEach(h => {
+    h.addEventListener('mousedown', e => {
+      connecting = { nodeId: node.id, handle: h.dataset.handle };
+      e.stopPropagation();
+      e.preventDefault();
+    });
+  });
+
+  el.querySelectorAll('.in-handle').forEach(h => {
+    h.addEventListener('mouseup', e => {
+      if (connecting && connecting.nodeId !== node.id) {
+        const exists = edges.find(ed=>ed.source===connecting.nodeId&&ed.target===node.id&&ed.sourceHandle===connecting.handle&&ed.targetHandle===h.dataset.handle);
+        if (!exists) {
+          edges.push({id:'e'+(++nodeCounter),source:connecting.nodeId,target:node.id,sourceHandle:connecting.handle,targetHandle:h.dataset.handle});
+        }
+      }
+      connecting = null;
+      drawEdges();
+      updateHint();
+      e.stopPropagation();
+    });
+  });
+
+  nodesLayer.appendChild(el);
+}
+
+function addNode(type, x, y) {
+  const id = 'n'+(++nodeCounter);
+  const node = {id, type, x, y};
+  nodes.push(node);
+  createNodeEl(node);
+  hint.style.display='none';
+  updateHint();
+  drawEdges();
+}
+
+function updateHint() {
+  const h = document.getElementById('status-hint');
+  if (nodes.length===0) { hint.style.display='block'; h.textContent='Build a pipeline then submit'; return; }
+  h.textContent = `${nodes.length} node${nodes.length!==1?'s':''}, ${edges.length} edge${edges.length!==1?'s':''}`;
+}
+
+canvasArea.addEventListener('mousemove', e => {
+  const r = canvasArea.getBoundingClientRect();
+  mousePos = {x: e.clientX-r.left, y: e.clientY-r.top};
+  if (draggingNode) {
+    draggingNode.x = mousePos.x - dragOffsetX;
+    draggingNode.y = mousePos.y - dragOffsetY;
+    const el = document.getElementById('node-'+draggingNode.id);
+    if (el) { el.style.left=draggingNode.x+'px'; el.style.top=draggingNode.y+'px'; }
+    drawEdges();
+  }
+  if (connecting) drawEdges();
+});
+
+canvasArea.addEventListener('mouseup', e => {
+  draggingNode = null;
+  if (connecting) { connecting = null; drawEdges(); }
+});
+
+canvasArea.addEventListener('dragover', e => e.preventDefault());
+canvasArea.addEventListener('drop', e => {
+  e.preventDefault();
+  const type = e.dataTransfer.getData('node-type');
+  if (!type) return;
+  const r = canvasArea.getBoundingClientRect();
+  addNode(type, e.clientX-r.left-100, e.clientY-r.top-40);
+});
+
+document.querySelectorAll('.node-pill').forEach(pill => {
+  pill.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('node-type', pill.dataset.type);
+  });
+});
+
+function isDAG() {
+  const adj = {};
+  nodes.forEach(n => adj[n.id]=[]);
+  edges.forEach(ed => { if(adj[ed.source]) adj[ed.source].push(ed.target); });
+  const inDeg = {};
+  nodes.forEach(n => inDeg[n.id]=0);
+  edges.forEach(ed => { if(inDeg[ed.target]!==undefined) inDeg[ed.target]++; });
+  const queue = nodes.filter(n=>inDeg[n.id]===0).map(n=>n.id);
+  let visited = 0;
+  while (queue.length) {
+    const cur = queue.shift(); visited++;
+    (adj[cur]||[]).forEach(nb => { inDeg[nb]--; if(inDeg[nb]===0) queue.push(nb); });
+  }
+  return visited === nodes.length;
+}
+
+document.getElementById('submit-btn').addEventListener('click', () => {
+  if (nodes.length===0) { alert('Add some nodes to the canvas first!'); return; }
+  const dag = isDAG();
+  const badge = document.getElementById('result-badge');
+  badge.style.display='block';
+  badge.textContent=`Nodes: ${nodes.length}  |  Edges: ${edges.length}  |  DAG: ${dag?'Yes ✓':'No ✗'}`;
+  badge.style.color = dag ? '#10b981' : '#f59e0b';
+  badge.style.background = dag ? '#10b98120' : '#f59e0b20';
+  badge.style.borderColor = dag ? '#10b98140' : '#f59e0b40';
+  alert(`Pipeline Analysis\n\nNodes: ${nodes.length}\nEdges: ${edges.length}\nIs DAG: ${dag ? 'Yes ✓' : 'No ✗ (cycle detected)'}`);
+});
+
+addNode('input', 30, 60);
+addNode('llm', 290, 100);
+addNode('output', 550, 140);
+setTimeout(()=>{
+  edges.push({id:'e-pre1',source:'n1',target:'n2',sourceHandle:'value',targetHandle:'prompt'});
+  edges.push({id:'e-pre2',source:'n2',target:'n3',sourceHandle:'response',targetHandle:'value'});
+  drawEdges();
+  updateHint();
+},100);
+</script>
